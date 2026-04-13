@@ -1,0 +1,84 @@
+# Name: Ankur Majumdar
+# Roll No. 2022BCD0046
+
+import json
+import os
+import joblib
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_squared_error, r2_score
+from pathlib import Path
+
+
+# Repo Root
+ROOT = Path(__file__).resolve().parents[1]
+DATA_PATH = ROOT / "dataset" / "winequality-red.csv"
+
+# Load Dataset
+data = pd.read_csv(DATA_PATH, sep=",")
+
+X = data.drop("quality", axis=1)
+y = data["quality"]
+
+# Experiment Config Details
+exp_id = "EXP-CI/CD"
+model_name = "Linear Regression"
+hyperparams = "Ridge Alpha-1"
+preprocess = "Standard"
+feature_select = "All Features"
+tt_split = "80-20"
+
+# Preprocessing
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+
+# Model
+model = Ridge(alpha=1)
+model.fit(X_train, y_train)
+
+# Evaluation
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print(
+    f"""
+# {exp_id}
+----------------------------------------
+Model               : {model_name}
+Hyperparameters     : {hyperparams}
+Preprocessing       : {preprocess}
+Feature Selection   : {feature_select}
+Train-Test Split    : {tt_split}
+----------------------------------------
+MSE                 : {mse}
+R2 Score            : {r2}
+"""
+)
+
+os.makedirs("artifacts", exist_ok=True)
+
+results = {
+    "Experiment ID": exp_id,
+    "Model": model_name,
+    "Hyperparameters": hyperparams,
+    "Preprocessing": preprocess,
+    "Feature Selection": feature_select,
+    "Train-Test Split": tt_split,
+    "MSE": mse,
+    "R2": r2,
+}
+
+joblib.dump(model, "artifacts/model.pkl")
+
+metrics = {"mse": float(mse), "r2": float(r2), "batch1_2022bcd0046": "Ankur Majumdar"}
+
+with open("artifacts/metrics.json", "w") as f:
+    json.dump(metrics, f)

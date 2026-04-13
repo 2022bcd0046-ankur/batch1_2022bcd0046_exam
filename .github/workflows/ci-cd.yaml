@@ -1,0 +1,80 @@
+name: "MLOps Lab Exam - 2022BCD0056"
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Train Model
+        run: |
+          python scripts/train.py
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: artifacts/
+
+  deploy:
+    needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code 
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: artifacts/
+
+      - name: Comparison for Best
+        run: |
+          echo "MSE=$(jq '.mse' artifacts/results.json)" >> $GITHUB_ENV
+          echo "R2=$(jq '.r2' artifacts/results.json)" >> $GITHUB_ENV
+
+          MSE_BETTER=$(echo "$MSE < ${{ vars.MSE_B }}" | bc -l)
+          R2_BETTER=$(echo "$R2 > ${{ vars.R2_B }}" | bc -l)
+
+          if [ "$MSE_BETTER" -eq 1 ] && [ "$R2_BETTER" -eq 1 ]; then
+            echo "Performance Better - Deploying..."
+          else
+            echo "Performance Worse - Exiting..."
+            exit 1
+          fi
+
+      - name: Update Current Vars
+        run: |
+          curl -s -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/MSE_B \
+            -d "{\"value\":\"$MSE\"}"
+
+          curl -s -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/R2_B \
+            -d "{\"value\":\"$R2\"}"
+
+      - name: Deploy & Push
+        run: |
+          echo ${{ secrets.DOC_TKN }} | docker login -u ${{ secrets.DH_USER }} --password-stdin
+          docker build -t ${{ secrets.DH_USER }}/batch1_2022bcd0046:latest .
+          docker push ${{ secrets.DH_USER }}/batch1_2022bcd0046:latest
