@@ -46,8 +46,8 @@ jobs:
 
       - name: Comparison for Best
         run: |
-          echo "MSE=$(jq '.mse' artifacts/results.json)" >> $GITHUB_ENV
-          echo "R2=$(jq '.r2' artifacts/results.json)" >> $GITHUB_ENV
+          echo "MSE=$(jq '.mse' artifacts/metrics.json)" >> $GITHUB_ENV
+          echo "R2=$(jq '.r2' artifacts/metrics.json)" >> $GITHUB_ENV
 
           MSE_BETTER=$(echo "$MSE < ${{ vars.MSE_B }}" | bc -l)
           R2_BETTER=$(echo "$R2 > ${{ vars.R2_B }}" | bc -l)
